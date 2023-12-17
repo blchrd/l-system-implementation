@@ -1,0 +1,1 @@
+{"start": "F", "rules": {"F": "F+G", "G": "F-G"}, "angle":90, "iter": 6}

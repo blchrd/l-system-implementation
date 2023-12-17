@@ -1,0 +1,9 @@
+{
+    "start":"F+G",
+    "rules":{
+        "F":"F+FG-[G+F-F]",
+        "G":"F-F+[FF-G-G]"
+    },
+    "angle":120,
+    "iter":3
+}
