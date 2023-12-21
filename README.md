@@ -5,7 +5,6 @@ This repo contains a simple implementation in Rust of [L-System](https://en.m.wi
 ## Usage
 
 ```
-cargo install
 cargo run -- [-f filepath]
 ```
 
