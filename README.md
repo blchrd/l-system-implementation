@@ -18,4 +18,4 @@ You have sample file in the `sample` folder.
 
 By default, the rendered image will be in the `render` folder, you can customize the output file with the `-o` parameter.
 
-Next and last step for this little project, is to randomize L-System if no input file in defined.
+If you didn't put an input file, a random LSystem will be generated. If the image is too wide (can cause allocation error), we remove one iteration from the system and try again.

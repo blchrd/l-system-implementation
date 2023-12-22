@@ -1,4 +1,5 @@
 use image::Rgb;
+use rand::Rng;
 use imageproc::{self, definitions::Image, drawing::draw_line_segment};
 use serde::{Serialize, Deserialize};
 use std::{collections::HashMap, f32::consts::PI, fs::File, io::Read};
@@ -37,7 +38,7 @@ fn get_arguments() -> Parameters {
     params
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde()]
 struct LSystem {
     start: String,
@@ -53,6 +54,47 @@ struct Segment {
 }
 
 impl LSystem {
+    pub fn build_random_lsystem(&mut self) {
+        let mut rand_gen: rand::rngs::ThreadRng = rand::thread_rng();
+
+        let angles = [36.0, 45.0, 60.0, 90.0, 120.0];
+        self.iter = rand_gen.gen_range(4..=8);
+        self.angle = angles[rand_gen.gen_range(0..angles.len())];
+        let alphabet: Vec<char> = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".chars().collect();
+        let mut control_char_set: Vec<char> = "+-]".chars().collect();
+        let mut char_set = Vec::<char>::new();
+        
+        let char_set_length = rand_gen.gen_range(0..8);
+        char_set.push('F');
+        for _ in 0..char_set_length {
+            char_set.push(alphabet[rand_gen.gen_range(0..alphabet.len())]);
+        }
+
+        let start_length = rand_gen.gen_range(0..4);
+        for _ in 0..=start_length {
+            self.start += &char_set[rand_gen.gen_range(0..char_set.len())].to_string();
+        }
+
+        let mut rules_char_set = char_set.clone();
+        rules_char_set.append(&mut control_char_set);
+        for char in char_set {
+            let rules_length = rand_gen.gen_range(0..=10);
+            if rules_length > 0 {
+                let mut rule = "".to_string();
+                for _ in 0..=rules_length {
+                    let rule_char = rules_char_set[rand_gen.gen_range(0..rules_char_set.len())];
+                    rule += &rule_char.to_string();
+
+                    if rule_char == ']' {
+                        let position = rand_gen.gen_range(0..rule.len());
+                        rule.insert(position, '[');
+                    }
+                }
+                self.rules.insert(char, rule.clone());
+            }
+        }
+    }
+
     pub fn build_render_string(&self) -> String {
         let mut render_string = self.clone().start;
         for _ in 0..self.clone().iter {
@@ -72,34 +114,14 @@ impl LSystem {
     }
 }
 
-fn main() {
+
+fn rendering_lsystem(lsystem: LSystem, output: String) {
     let draw_variable = "ABCDEFGHIJKLMNOPQRSTUVWZ";
     let move_variable = "abcdefghijklmnopqrstuvwz";
     let starting_point = (0.0, 0.0);
-    let segment_length = 15.0;
-    let params = get_arguments();
+    let segment_length = 10.0;
 
-    let lsystem: LSystem;
-    
-    if params.file != "" {
-        let mut file = File::open(params.file).unwrap();
-        let mut data = String::new();
-        file.read_to_string(&mut data).unwrap();
-        lsystem = serde_json::from_str(&data).expect("JSON");
-    } else if params.json != "" {
-        let data = params.json;
-        lsystem = serde_json::from_str(&data).expect("JSON");
-    } else {
-        // TODO: Randomize LSystem
-        lsystem = LSystem {
-            start: "F".to_string(),
-            rules: [('F', "F+F-F-F+F".to_string())].iter().cloned().collect(),
-            angle: 90.0,
-            iter: 3,
-        }
-    }
-    
-
+    println!("Building rendering string...");
     let render_string = lsystem.build_render_string();
 
     let mut current_point = starting_point.clone();
@@ -152,6 +174,13 @@ fn main() {
 
     let width = (downright_point.0 - upleft_point.0) as u32;
     let height = (downright_point.1 - upleft_point.1) as u32;
+    if width > 3000 || height > 3000 {
+        println!("\nKill switch, remove one iteration");
+        let mut lsystem_temp = lsystem.clone();
+        lsystem_temp.iter -= 1;
+        rendering_lsystem(lsystem_temp, output);
+        return();
+    }
 
     // Get the drawing starting point to center the figure in the image (translation by up left point)
     let start_point = ((min_x - starting_point.0).abs() + 50.0, (min_y - starting_point.1).abs() + 50.0);
@@ -171,8 +200,39 @@ fn main() {
             );
     }
 
-    let _ = buffer.save(params.output);
-    println!("\rRendering done         ");
+    //Add the LSystem in the image (not working well, so I comment it)
+    // let font_data: &[u8] = include_bytes!("../fonts/DejaVuSansMono.ttf");
+    // let font: Font<'static> = Font::try_from_bytes(font_data).unwrap();
+    // buffer = draw_text(&buffer, Rgb([128,128,128]), 10, 10, Scale{x: 15.0, y: 15.0}, &font, &lsystem_json);
+
+    let _ = buffer.save(output);
+    println!("\rRendering done         \n");
+}
+
+fn main() {
+    let params = get_arguments();
+
+    let mut lsystem: LSystem;
+    
+    if params.file != "" {
+        let mut file = File::open(params.file).unwrap();
+        let mut data = String::new();
+        file.read_to_string(&mut data).unwrap();
+        lsystem = serde_json::from_str(&data).expect("JSON");
+    } else if params.json != "" {
+        let data = params.json;
+        lsystem = serde_json::from_str(&data).expect("JSON");
+    } else {
+        // TODO: Randomize LSystem
+        lsystem = LSystem::default();
+
+        lsystem.build_random_lsystem();
+    }
+
+    let lsystem_json = serde_json::to_string(&lsystem).unwrap();
+    println!("{}", lsystem_json);
+    
+    rendering_lsystem(lsystem, params.output);
 }
 
 #[test]
