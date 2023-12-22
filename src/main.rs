@@ -6,6 +6,7 @@ use std::{collections::HashMap, f32::consts::PI, fs::File, io::Read};
 struct Parameters {
     file: String,
     json: String,
+    output: String,
 }
 
 fn get_arguments() -> Parameters {
@@ -13,16 +14,24 @@ fn get_arguments() -> Parameters {
     let mut params = Parameters {
         file: "".to_string(),
         json: "".to_string(),
+        output: "./render/test.png".to_string(),
     };
 
-    if args.len() < 2 {
+    if args.len() < 3 {
         return params;
     }
 
     if args[1] == "-f" {
         params.file = args[2].clone();
-    } else if args[2] == "-j" {
+    } else if args[1] == "-j" {
         params.json = args[2].clone();
+    }
+
+    if args.contains(&"-o".to_string()) {
+        let index = args.iter().position(|r| r == "-o").unwrap();
+        if args.len() > index+1 {
+            params.output = args[index+1].clone();
+        }
     }
 
     params
@@ -35,6 +44,12 @@ struct LSystem {
     rules: HashMap<char, String>,
     angle: f32,
     iter: u32,
+}
+
+#[derive(Debug, Clone)]
+struct Segment {
+    start: (f32, f32),
+    end: (f32, f32),
 }
 
 impl LSystem {
@@ -60,9 +75,7 @@ impl LSystem {
 fn main() {
     let draw_variable = "ABCDEFGHIJKLMNOPQRSTUVWZ";
     let move_variable = "abcdefghijklmnopqrstuvwz";
-    let width=500;
-    let height=500;
-    let starting_point = (250.0,250.0);
+    let starting_point = (0.0, 0.0);
     let segment_length = 15.0;
     let params = get_arguments();
 
@@ -77,6 +90,7 @@ fn main() {
         let data = params.json;
         lsystem = serde_json::from_str(&data).expect("JSON");
     } else {
+        // TODO: Randomize LSystem
         lsystem = LSystem {
             start: "F".to_string(),
             rules: [('F', "F+F-F-F+F".to_string())].iter().cloned().collect(),
@@ -88,25 +102,20 @@ fn main() {
 
     let render_string = lsystem.build_render_string();
 
-    let mut buffer = Image::new(width, height);
-    let color = Rgb([255 as u8, 255 as u8, 255 as u8]);
-
     let mut current_point = starting_point.clone();
-    let mut angle = lsystem.angle;
+    let mut angle = 180.0;
     let mut stack = Vec::<((f32, f32), f32)>::new();
     
-    let mut char_index = 1;
-    let render_string_length = render_string.len();
-    print!("Rendering...     ");
-    for char in render_string.chars() {
-        print!("\rRendering... {:.1} %  ", (char_index as f32 / render_string_length as f32)*100.0);
-        char_index += 1;
+    let mut segments = Vec::<Segment>::new();
 
+    print!("Rendering...     ");
+    // Get all the segment of the rendering (actual rendering is done later)
+    for char in render_string.chars() {
         let next_point: Option<(f32, f32)>;
         
         match char {
-            '+' => {next_point = None; angle += lsystem.angle},
-            '-' => {next_point = None; angle -= lsystem.angle},
+            '+' => {next_point = None; angle -= lsystem.angle},
+            '-' => {next_point = None; angle += lsystem.angle},
             '[' => {next_point = None; stack.push((current_point, angle));},
             ']' => {next_point = None; (current_point, angle) = stack.pop().unwrap();},
             _ => {
@@ -128,12 +137,41 @@ fn main() {
         }
 
         if next_point.is_some() {
-            buffer = draw_line_segment(&buffer, current_point,next_point.unwrap(), color);
+            segments.push(Segment{start: current_point, end: next_point.unwrap()});
             current_point = next_point.unwrap().clone();
         }
     }
 
-    let _ = buffer.save("./render/test.png");
+    // Getting the bound of the image
+    let min_x = segments.iter().map(|s| f32::min(s.start.0, s.end.0)).into_iter().fold(0.0f32, |min_val, val| val.min(min_val));
+    let min_y = segments.iter().map(|s| f32::min(s.start.1, s.end.1)).into_iter().fold(0.0f32, |min_val, val| val.min(min_val));
+    let max_x = segments.iter().map(|s| f32::max(s.start.0, s.end.0)).into_iter().fold(0.0f32, |max_val, val| val.max(max_val));
+    let max_y = segments.iter().map(|s| f32::max(s.start.1, s.end.1)).into_iter().fold(0.0f32, |max_val, val| val.max(max_val));
+    let upleft_point = (min_x - 50.0, min_y - 50.0);
+    let downright_point = (max_x + 50.0, max_y + 50.0);
+
+    let width = (downright_point.0 - upleft_point.0) as u32;
+    let height = (downright_point.1 - upleft_point.1) as u32;
+
+    // Get the drawing starting point to center the figure in the image (translation by up left point)
+    let start_point = ((min_x - starting_point.0).abs() + 50.0, (min_y - starting_point.1).abs() + 50.0);
+
+    //Render the actual image
+    let mut buffer = Image::new(width, height);
+    let color = Rgb([255 as u8, 255 as u8, 255 as u8]);
+    let mut index = 1;
+    let segment_count = segments.len();
+    for segment in segments {
+        print!("\rRendering... {:.1} %  ", (index as f32 / segment_count as f32)*100.0);
+        index += 1;
+        buffer = draw_line_segment(
+            &buffer,
+             (segment.start.0 + start_point.0, segment.start.1 + start_point.1),
+              (segment.end.0 + start_point.0, segment.end.1 + start_point.1), color
+            );
+    }
+
+    let _ = buffer.save(params.output);
     println!("\rRendering done         ");
 }
 
