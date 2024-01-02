@@ -1,6 +1,6 @@
-use image::Rgb;
+use image::{Rgba, RgbaImage};
 use rand::Rng;
-use imageproc::{self, definitions::Image, drawing::draw_line_segment};
+use imageproc::{self, drawing::draw_antialiased_line_segment};
 use serde::{Serialize, Deserialize};
 use std::{collections::HashMap, f32::consts::PI, fs::File, io::Read};
 
@@ -186,24 +186,34 @@ fn rendering_lsystem(lsystem: LSystem, output: String) {
     let start_point = ((min_x - starting_point.0).abs() + 50.0, (min_y - starting_point.1).abs() + 50.0);
 
     //Render the actual image
-    let mut buffer = Image::new(width, height);
-    let color = Rgb([255 as u8, 255 as u8, 255 as u8]);
+    let mut buffer = RgbaImage::from_pixel(width, height, Rgba([0 as u8, 0 as u8, 0 as u8, 0]));
+    let color = Rgba([128 as u8, 128 as u8, 128 as u8, 255]);
     let mut index = 1;
     let segment_count = segments.len();
     for segment in segments {
         print!("\rRendering... {:.1} %  ", (index as f32 / segment_count as f32)*100.0);
         index += 1;
-        buffer = draw_line_segment(
-            &buffer,
-             (segment.start.0 + start_point.0, segment.start.1 + start_point.1),
-              (segment.end.0 + start_point.0, segment.end.1 + start_point.1), color
-            );
+        buffer = draw_antialiased_line_segment(
+            &buffer, 
+            (segment.start.0 as i32 + start_point.0 as i32, segment.start.1 as i32 + start_point.1 as i32), 
+            (segment.end.0 as i32 + start_point.0 as i32, segment.end.1 as i32 + start_point.1 as i32), 
+            color, 
+            |_, _, _| Rgba([128 as u8, 128 as u8, 128 as u8, 255])
+        );
     }
 
     //Add the LSystem in the image (not working well, so I comment it)
     // let font_data: &[u8] = include_bytes!("../fonts/DejaVuSansMono.ttf");
     // let font: Font<'static> = Font::try_from_bytes(font_data).unwrap();
-    // buffer = draw_text(&buffer, Rgb([128,128,128]), 10, 10, Scale{x: 15.0, y: 15.0}, &font, &lsystem_json);
+    // buffer = draw_text(
+    //     &buffer,
+    //     Rgba([128,128,128,255]), 
+    //     10, 
+    //     10, 
+    //     Scale{x: height as f32/75.0, y: width as f32/75.0}, 
+    //     &font, 
+    //     &serde_json::to_string(&lsystem).unwrap()
+    // );
 
     let _ = buffer.save(output);
     println!("\rRendering done         \n");
@@ -212,7 +222,7 @@ fn rendering_lsystem(lsystem: LSystem, output: String) {
 fn main() {
     let params = get_arguments();
 
-    let mut lsystem: LSystem;
+    let mut lsystem: LSystem = LSystem::default();
     
     if params.file != "" {
         let mut file = File::open(params.file).unwrap();
@@ -223,9 +233,6 @@ fn main() {
         let data = params.json;
         lsystem = serde_json::from_str(&data).expect("JSON");
     } else {
-        // TODO: Randomize LSystem
-        lsystem = LSystem::default();
-
         lsystem.build_random_lsystem();
     }
 
