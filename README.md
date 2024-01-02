@@ -2,6 +2,22 @@
 
 This repo contains a simple implementation in Rust of [L-System](https://en.m.wikipedia.org/wiki/L-system) to generate images.
 
+Example of rendering for the L-System 
+
+```json
+{
+    "start":"F+G",
+    "rules":{
+        "F":"F+FG-[G+F-F]",
+        "G":"F-F+[FF-G-G]"
+    },
+    "angle":120,
+    "iter":3
+}
+```
+
+![Example](sample/example.png)
+
 ## Usage
 
 ```
