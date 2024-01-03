@@ -93,6 +93,12 @@ impl LSystem {
                 self.rules.insert(char, rule.clone());
             }
         }
+
+        // Trash L-System that draw nothing
+        if !self.build_render_string().contains(&alphabet[..]) {
+            self.build_random_lsystem();
+            return;
+        }
     }
 
     pub fn build_render_string(&self) -> String {
