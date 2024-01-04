@@ -20,6 +20,8 @@ Example of rendering for the L-System
 
 ## Usage
 
+To use this software, you need to install the Rust toolchains by following the instruction on the [official website](https://www.rust-lang.org/tools/install).
+
 ```
 cargo run -- [-f filepath] [-o file]
 ```
